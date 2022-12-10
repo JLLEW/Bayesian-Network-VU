@@ -55,7 +55,7 @@ class BNReasoner:
         return output_net
 
     # d-separation
-    def is_d_seperated(self, X: list, Y: list, Z: list) -> bool:
+    def are_d_seperated(self, X: list, Y: list, Z: list) -> bool:
         # make sure that X, Y and Z are sets and conists of unique variables
         X = set(X)
         Y = set(Y)
@@ -80,6 +80,7 @@ class BNReasoner:
         for edge in edges:
             graph.del_edge(edge)
 
+        # check if X and Y are disconnected in the graph
         # create empty UnionFind instance
         disjoint_set = UnionFind(graph.structure.nodes())
         # get weakly connected components
@@ -99,8 +100,29 @@ class BNReasoner:
                 if disjoint_set[y] == disjoint_set[x]:
                     return False
 
+        # X and Y are disconnected in pruned graph
         return True
 
-    
+    def are_independent(self, X: list, Y: list, Z: list) -> bool:
+        # d-separation implies an independence
+        if self.are_d_seperated(X, Y, Z):
+            return True
 
+        # if there is a direct edge then X and Y are not independent
+        edges = self.bn.structure.edges()
+        for x in X:
+            for y in Y:
+                if (x, y) in edges or (y,x) in edges:
+                    return False
+        
+        return True
 
+    # marginalize by summing-out
+    def marginalize(self, factor: pd.DataFrame, var: str) -> pd.DataFrame:
+        vars = [col_name for col_name in factor.columns if col_name not in [var, "p", " "]]
+        marginalized = factor.groupby(vars).sum().reset_index()
+        if 'p' in marginalized.columns:
+            marginalized = marginalized.drop(var, axis=1)
+            marginalized = marginalized.rename(columns={"p" : f"\u03A3 {var}"})
+
+        return marginalized
