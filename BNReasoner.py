@@ -4,6 +4,7 @@ from copy import deepcopy
 from networkx.utils import UnionFind
 import pandas as pd
 import networkx as nx
+import itertools
 
 
 class BNReasoner:
@@ -126,3 +127,25 @@ class BNReasoner:
             marginalized = marginalized.rename(columns={"p" : f"\u03A3 {var}"})
 
         return marginalized
+
+    def factors_multiplication(self, factors: list) -> pd.DataFrame:
+        # construct empty output factor as a truth table
+        vars = [x.columns.values.tolist() for x in factors]
+        vars = set(itertools.chain.from_iterable(vars))
+        vars.remove('p')
+        vars = list(vars)
+        truth_table = pd.DataFrame(list(itertools.product([False, True], repeat=len(vars))), columns=vars)
+        truth_table['p'] = 1.0
+
+        # update truth_table by a multiplication of p from compatible rows from factors
+        for factor in factors:
+            for index, row in truth_table.iterrows():
+                series = pd.Series(row)
+                vars = set(factor.columns.values.tolist())
+                vars.remove('p')
+                vars = list(vars)
+                series = series[vars]
+                p = self.bn.get_compatible_instantiations_table(series, factor).iloc[0]['p']
+                truth_table.at[index, 'p'] *=  p
+
+        return truth_table
